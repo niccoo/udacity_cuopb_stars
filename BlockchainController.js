@@ -17,6 +17,7 @@ class BlockchainController {
         this.submitStar();
         this.getBlockByHash();
         this.getStarsByOwner();
+        this.getChainValidity();
     }
 
     // Enpoint to Get a Block by Height (GET Endpoint)
@@ -117,6 +118,24 @@ class BlockchainController {
             
         });
     }
+
+// Create an endpoint that will trigger the execution of validateChain(). 
+// Please create the endpoint in the file BlockchainController.js and test it with Postman.
+    getChainValidity() {
+        this.app.get("/chainvalidity", async (req, res) => {
+            
+            let invalidBlocks = await this.blockchain.validateChain()
+
+            if(invalidBlocks.length === 0){
+                return res.status(200).send("The chain integrity check was successful");
+            } else {
+                return res.status(404).send("The chain integrity check failed");
+            }
+            
+            
+        });
+    }
+
 
 }
 

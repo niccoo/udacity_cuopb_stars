@@ -75,11 +75,23 @@ class Blockchain {
             // Block hash with SHA256 using block and converting to a string
             block.hash = SHA256(JSON.stringify(block)).toString();
             // Adding block object to chain
+            /*
+            console.log("adding block to the chain:")
+            console.log("------")
+            console.log(block)
+            console.log("------")
+            */
             self.chain.push(block);
-
-            if(self.chain.length !== block.height + 1){
-                reject(Error("Could not add the block"))
+            
+            let invalidBlocks = []
+            invalidBlocks = await self.validateChain()
+            
+            if(invalidBlocks.length > 0){
+                console.log("invalid blocks found : ")
+                console.log(invalidBlocks)
+                reject(Error("Could not add the block - chain integrity tampered"))
             }else{
+                console.log("All chain blocks where verified")
                 resolve(block)    
             }
         });
@@ -129,15 +141,15 @@ class Blockchain {
             
             let msgTime  = parseInt(message.split(':')[1])
             let currentTime = parseInt(new Date().getTime().toString().slice(0, -3))
-
+            
             // Check if 5 minutes have elapsed
-            if(currentTime - msgTime <= 300000){
+            if(currentTime - msgTime < (5 * 60 * 1000)){
                 if(bitcoinMessage.verify(message, address, signature)){
                     let block = new BlockClass.Block({data: star, owner: address})
                     
                     self._addBlock(block).then(function(result) {
-                        console.log("Block added successfuly!", result);
-                        resolve(block)
+                        console.log("Block added successfuly!");
+                        resolve(result)
                       }).catch(function(error) {
                         console.log("Failed!", error);
                         reject("Failed adding block!")
@@ -226,17 +238,31 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
             
             let errorLog = [];
-            for (var i = 0; i < self.chain.length-1; i++) {
-              // validate block
-              if (!self.validate(i)) errorLog.push(i);
-              // compare blocks hash link
-              let blockHash = self.chain[i].hash;
-              let previousHash = self.chain[i+1].previousBlockHash;
-              if (blockHash!==previousHash) {
-                errorLog.push(i);
-              }
-            }
-            resolve(errorLog)
+            
+            self.chain.forEach(async (b) => {
+                console.log("Checking integrity of block #" + b.height + " in the chain...")
+                let isBlockValid = await b.validate()
+                //console.log("testing block : " + isBlockValid)
+                //console.log("error log:")
+                //console.log(errorLog)
+                if (!isBlockValid) {
+                    errorLog.push(b);
+                    console.log("Block structure invalid")
+                }
+
+                // compare blocks hash link
+                if(b.height > 1){ //starting from second item in the chain
+                    //let blockPreviousHash = b.previousBlockHash;
+                    let previousHash = self.chain[b.height - 1].hash;
+                    if (b.previousBlockHash!==previousHash) {
+                        console.log("b.prev  : " + b.previousBlockHash)
+                        console.log("prevHash: " + previousHash)
+                        errorLog.push(b);
+                        console.log("Previous block hash not referenced in block")
+                    }
+                }
+            });
+            resolve(errorLog);
         });
     }
 
